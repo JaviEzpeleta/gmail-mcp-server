@@ -113,6 +113,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["query"],
         },
       },
+      {
+        name: "find_and_draft_reply",
+        description: "Busca el último email de un remitente específico y crea un draft de respuesta",
+        inputSchema: {
+          type: "object",
+          properties: {
+            senderName: {
+              type: "string",
+              description: "Nombre del remitente a buscar (ej: 'Pepe', 'juan@example.com')",
+            },
+          },
+          required: ["senderName"],
+        },
+      },
     ],
   }
 })
@@ -279,6 +293,120 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: `Error buscando emails: ${error}`,
+            },
+          ],
+        }
+      }
+    }
+
+    case "find_and_draft_reply": {
+      const { senderName } = request.params.arguments as any
+
+      try {
+        // Buscar emails del remitente específico
+        const searchQuery = senderName.includes("@") 
+          ? `from:${senderName}` 
+          : `from:${senderName}`
+        
+        const response = await gmail.users.messages.list({
+          userId: "me",
+          q: searchQuery,
+          maxResults: 1, // Solo necesitamos el más reciente
+        })
+
+        const messages = response.data.messages || []
+
+        if (messages.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `No se encontraron emails de "${senderName}".`,
+              },
+            ],
+          }
+        }
+
+        // Obtener detalles del email más reciente
+        const latestMessage = messages[0]
+        const detail = await gmail.users.messages.get({
+          userId: "me",
+          id: latestMessage.id!,
+        })
+
+        const headers = detail.data.payload?.headers || []
+        const originalSubject = headers.find((h) => h.name === "Subject")?.value || "Sin asunto"
+        const fromEmail = headers.find((h) => h.name === "From")?.value || "Desconocido"
+        const messageId = headers.find((h) => h.name === "Message-ID")?.value || ""
+        
+        // Extraer solo el email del From header
+        const emailMatch = fromEmail.match(/<(.+?)>/) || fromEmail.match(/([^\s<>]+@[^\s<>]+)/)
+        const replyToEmail = emailMatch ? emailMatch[1] || emailMatch[0] : fromEmail
+
+        // Crear subject para la respuesta
+        const replySubject = originalSubject.startsWith("Re: ") 
+          ? originalSubject 
+          : `Re: ${originalSubject}`
+
+        // Crear el draft de respuesta con headers MIME correctos para UTF-8
+        const draftMessage = [
+          `MIME-Version: 1.0`,
+          `Content-Type: text/plain; charset=UTF-8`,
+          `Content-Transfer-Encoding: 8bit`,
+          `To: ${replyToEmail}`,
+          `Subject: ${replySubject}`,
+          messageId ? `In-Reply-To: ${messageId}` : "",
+          messageId ? `References: ${messageId}` : "",
+          "",
+          `Hola,`,
+          "",
+          `[Escribe tu respuesta aquí]`,
+          "",
+          `Saludos`,
+        ].filter(line => line !== "").join("\n")
+
+        const encodedDraftMessage = Buffer.from(draftMessage, 'utf-8')
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "")
+
+        const draftResult = await gmail.users.drafts.create({
+          userId: "me",
+          requestBody: {
+            message: {
+              raw: encodedDraftMessage,
+              threadId: detail.data.threadId, // Añadir el draft al thread del email original
+            },
+          },
+        })
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ Draft creado exitosamente!
+              
+📧 Email original encontrado:
+- De: ${fromEmail}
+- Asunto: ${originalSubject}
+- Snippet: ${detail.data.snippet}
+
+📝 Draft creado:
+- Para: ${replyToEmail}
+- Asunto: ${replySubject}
+- Draft ID: ${draftResult.data.id}
+
+El draft está listo en tu Gmail para que lo edites y envíes cuando quieras.`,
+            },
+          ],
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error buscando email o creando draft: ${error}`,
             },
           ],
         }
