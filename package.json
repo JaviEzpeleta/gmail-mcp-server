@@ -22,6 +22,7 @@
   "homepage": "https://github.com/JaviEzpeleta/cc-gmail-mcp-experiments#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.1",
+    "dotenv": "^17.2.1",
     "googleapis": "^155.0.0"
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+import "dotenv/config"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
@@ -11,6 +12,16 @@ import { OAuth2Client } from "google-auth-library"
 const CLIENT_ID = process.env.GMAIL_CLIENT_ID
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET
 const REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN
+
+// Validar variables de entorno
+if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
+  console.error("❌ Error: Faltan variables de entorno requeridas")
+  console.error("Asegúrate de tener en tu archivo .env:")
+  console.error("- GMAIL_CLIENT_ID")
+  console.error("- GMAIL_CLIENT_SECRET")
+  console.error("- GMAIL_REFRESH_TOKEN")
+  process.exit(1)
+}
 
 const oauth2Client = new OAuth2Client(
   CLIENT_ID,
