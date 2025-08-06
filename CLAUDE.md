@@ -117,7 +117,6 @@ npm run dev      # Development mode with hot reloading (tsx)
 npm run setup    # Generate OAuth2 refresh token
 npm test         # Run test suite
 npm run lint     # Check code quality
-npm run format   # Auto-format code
 ```
 
 ### Environment Setup
