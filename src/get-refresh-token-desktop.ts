@@ -9,12 +9,12 @@ const CLIENT_ID = process.env.GMAIL_CLIENT_ID
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
-  console.error("❌ Error: Faltan variables de entorno GMAIL_CLIENT_ID y GMAIL_CLIENT_SECRET")
-  console.error("Asegúrate de tener estas variables en tu archivo .env")
+  console.error("❌ Error: Missing GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET environment variables")
+  console.error("Make sure you have these variables in your .env file")
   process.exit(1)
 }
 
-// Para Desktop apps, podemos usar localhost o el URI especial de Google
+// For Desktop apps, we can use localhost or Google's special URI
 const REDIRECT_URI = "http://localhost:3000/oauth2callback"
 const oauth2Client = new google.auth.OAuth2(
   CLIENT_ID,
@@ -29,31 +29,31 @@ const SCOPES = [
 ]
 
 async function getRefreshToken() {
-  // Crear servidor temporal para capturar el código
+  // Create temporary server to capture the authorization code
   const server = http.createServer(async (req, res) => {
     if (req.url && req.url.indexOf("/oauth2callback") > -1) {
       const qs = new url.URL(req.url, `http://localhost:3000`).searchParams
       const code = qs.get("code")
 
-      res.end("✅ Autorización recibida! Puedes cerrar esta ventana.")
+      res.end("✅ Authorization received! You can close this window.")
       server.close()
 
       if (code) {
         try {
           const { tokens } = await oauth2Client.getToken(code)
 
-          console.log("\n✅ ¡ÉXITO! Aquí están tus tokens:\n")
+          console.log("\n✅ SUCCESS! Here are your tokens:\n")
           console.log("=".repeat(50))
           console.log(`GMAIL_CLIENT_ID=${CLIENT_ID}`)
           console.log(`GMAIL_CLIENT_SECRET=${CLIENT_SECRET}`)
           console.log(`GMAIL_REFRESH_TOKEN=${tokens.refresh_token}`)
           console.log("=".repeat(50))
-          console.log("\n💾 Guarda estas variables en tu archivo .env")
-          console.log("📝 El refresh token es permanente - no lo pierdas!\n")
+          console.log("\n💾 Save these variables to your .env file")
+          console.log("📝 The refresh token is permanent - don't lose it!\n")
 
           process.exit(0)
         } catch (error) {
-          console.error("❌ Error obteniendo tokens:", error)
+          console.error("❌ Error obtaining tokens:", error)
           process.exit(1)
         }
       }
@@ -61,7 +61,7 @@ async function getRefreshToken() {
   })
 
   server.listen(3000, () => {
-    // Generar URL de autorización
+    // Generate authorization URL
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: SCOPES,
@@ -69,9 +69,9 @@ async function getRefreshToken() {
       prompt: "consent",
     })
 
-    console.log("🚀 Abriendo navegador para autorización...\n")
+    console.log("🚀 Opening browser for authorization...\n")
 
-    // Intentar abrir el navegador automáticamente
+    // Try to open browser automatically
     const start =
       process.platform === "darwin"
         ? "open"
@@ -81,16 +81,16 @@ async function getRefreshToken() {
 
     exec(`${start} "${authUrl}"`, (error) => {
       if (error) {
-        console.log("No se pudo abrir el navegador automáticamente.")
-        console.log("Por favor, abre esta URL manualmente:\n")
+        console.log("Could not open browser automatically.")
+        console.log("Please open this URL manually:\n")
         console.log(authUrl)
       }
     })
 
-    console.log("\n⏳ Esperando autorización...")
+    console.log("\n⏳ Waiting for authorization...")
   })
 }
 
-// Ejecutar
-console.log("🔐 Gmail OAuth Setup para Terminal/CLI\n")
+// Execute
+console.log("🔐 Gmail OAuth Setup for Terminal/CLI\n")
 getRefreshToken()

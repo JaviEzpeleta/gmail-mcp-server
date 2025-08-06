@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "gmail": {
+      "command": "node",
+      "args": ["/absolute/path/to/gmail-mcp-server/dist/index.js"],
+      "env": {
+        "GMAIL_CLIENT_ID": "your_client_id_here.apps.googleusercontent.com",
+        "GMAIL_CLIENT_SECRET": "your_client_secret_here",
+        "GMAIL_REFRESH_TOKEN": "your_refresh_token_here"
+      }
+    }
+  }
+}
