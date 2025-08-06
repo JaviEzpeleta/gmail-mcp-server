@@ -4,9 +4,12 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 
 ## 🎯 Project Overview
 
-Gmail MCP (Model Context Protocol) server built with TypeScript that provides tools for interacting with Gmail through the Google APIs. It uses OAuth2 authentication and exposes Gmail functionality as MCP tools, enabling AI assistants to perform email operations securely.
+Gmail MCP (Model Context Protocol) server built with TypeScript that provides tools for interacting with Gmail through the Google APIs. It uses OAuth2 authentication and exposes Gmail functionality as MCP tools, enabling AI assistants to perform email operations **safely with draft-first security**.
 
 ### Key Features
+- **🛡️ Safety-first design**: Draft-only mode by default prevents accidental email sends
+- **📝 Smart draft tools**: Create drafts for new emails and replies with custom content
+- **🧵 Intelligent threading**: Drafts appear in original email conversations, not just Drafts folder
 - Full Gmail API integration with OAuth2 authentication
 - Type-safe TypeScript implementation with strict typing
 - MCP protocol compliance for AI assistant integration
@@ -20,14 +23,15 @@ Gmail MCP (Model Context Protocol) server built with TypeScript that provides to
 
 1. **MCP Server Setup** (`src/index.ts:89-99`)
    - Uses `@modelcontextprotocol/sdk` to create an MCP server
-   - Server name: `gmail-mcp-server` v1.1.0
+   - Server name: `gmail-mcp-server` v1.2.0
    - Configured with tools capability
    - Communicates via StdioServerTransport
 
-2. **OAuth2 Authentication** (`src/index.ts:60-86`)
+2. **OAuth2 Authentication** (`src/index.ts:60-90`)
    - Google OAuth2Client configured with credentials from environment
    - Uses refresh token for persistent authentication
    - Gmail API client initialized with authenticated OAuth2 client
+   - **Security flag**: `GMAIL_ALLOW_DIRECT_SEND` controls email sending permissions
    - Validates environment variables on startup
 
 3. **Type System** (`src/index.ts:11-58`)
@@ -42,20 +46,22 @@ Gmail MCP (Model Context Protocol) server built with TypeScript that provides to
    - Handles both plain text and HTML emails
    - Smart content extraction from multipart messages
 
-5. **Available Tools** (`src/index.ts:148-270`)
+5. **Available Tools** (`src/index.ts:148-300`)
    - **list_emails**: Lists recent emails with filtering and pagination
    - **get_email_details**: Retrieves full email content by ID
-   - **send_email**: Sends emails with CC/BCC support
+   - **🛡️ create_draft**: Creates email drafts safely with optional threading support
+   - **🔒 send_email**: Direct email sending (disabled by default for security)
    - **search_emails**: Advanced search using Gmail query syntax
-   - **find_and_draft_reply**: Creates draft replies to specific senders
+   - **🧵 find_and_draft_reply**: Creates properly threaded draft replies (RECOMMENDED for replies)
 
 ### Key Implementation Details
 
-- **Request Handling** (`src/index.ts:273-690`)
+- **Request Handling** (`src/index.ts:290-850`)
   - Switch statement pattern for tool request routing
+  - **Security checks**: Validates `GMAIL_ALLOW_DIRECT_SEND` before email sending
   - Each tool handler includes comprehensive error handling
   - Type casting with proper interfaces for arguments
-  - Detailed error messages with helpful tips
+  - Detailed error messages with helpful tips and security warnings
 
 - **Performance Optimizations**
   - Parallel promise execution for fetching multiple emails
@@ -122,15 +128,22 @@ GMAIL_CLIENT_SECRET  # OAuth2 client secret
 GMAIL_REFRESH_TOKEN  # OAuth2 refresh token for persistent auth
 ```
 
+Optional security variables:
+```bash
+GMAIL_ALLOW_DIRECT_SEND=false  # Default: false (drafts only)
+GMAIL_ALLOW_DIRECT_SEND=true   # Enable direct email sending (NOT recommended)
+```
+
 ## 🚀 Development Workflow
 
 ### Adding New Features
 1. Define TypeScript interface for arguments
 2. Add tool definition in `ListToolsRequestSchema` handler
 3. Implement handler in `CallToolRequestSchema` switch
-4. Add comprehensive error handling
-5. Update documentation in README.md
-6. Test with Claude Desktop integration
+4. **Add security checks** if tool involves sensitive operations
+5. Add comprehensive error handling with safety warnings
+6. Update documentation in README.md and CLAUDE.md
+7. Test with Claude Desktop integration
 
 ### Testing Strategy
 1. **Unit testing**: Test individual functions
@@ -163,6 +176,12 @@ GMAIL_REFRESH_TOKEN  # OAuth2 refresh token for persistent auth
 - Use refresh tokens instead of access tokens
 - Implement token rotation when needed
 - Validate all user inputs before API calls
+
+### Email Safety
+- **🛡️ Draft-first approach**: Default behavior creates drafts, not sent emails
+- **🚨 Explicit confirmation**: Direct sending requires explicit environment flag
+- **📝 Clear messaging**: Always indicate whether email was sent or drafted
+- **🔍 User review**: Encourage manual review of all drafts before sending
 
 ### Data Privacy
 - Don't log email content in production
@@ -204,7 +223,23 @@ GMAIL_REFRESH_TOKEN  # OAuth2 refresh token for persistent auth
 
 ## 🔄 Version History
 
-### v1.1.0 (Current)
+### v1.3.0 (Current)
+- **🧵 THREADING OVERHAUL**: Enhanced email conversation threading
+- **⚡ Improved `find_and_draft_reply`**: Better email parsing, robust error handling, proper References headers
+- **🎯 Enhanced `create_draft`**: Optional threading support with `threadId` and `inReplyToMessageId` parameters
+- **📍 Inbox integration**: Draft replies now appear in original email conversations, not just Drafts folder
+- **🔍 Better search**: Excludes sent items when finding emails to reply to
+- **📋 Clear tool guidance**: Updated descriptions to clarify when to use each tool
+
+### v1.2.0
+- **🛡️ SECURITY OVERHAUL**: Draft-first safety system
+- **📝 New tool**: `create_draft` for safe email composition
+- **🔒 Protected sending**: `send_email` disabled by default
+- **⚡ Enhanced replies**: `find_and_draft_reply` accepts custom content
+- **🚨 Safety warnings**: Clear messaging about drafts vs sent emails
+- **📋 Documentation**: Complete security guidelines and best practices
+
+### v1.1.0
 - Added `get_email_details` tool
 - Improved error handling and user feedback
 - Enhanced TypeScript typing
@@ -227,10 +262,12 @@ GMAIL_REFRESH_TOKEN  # OAuth2 refresh token for persistent auth
 
 For developers new to this codebase:
 1. Start with `README.md` for setup instructions
-2. Review type definitions in `src/index.ts:11-58`
-3. Understand tool implementations in `src/index.ts:273-690`
-4. Test with `test-gmail-connection.ts`
-5. Integrate with Claude Desktop for real-world testing
+2. **⚠️ Read security guidelines** in this file first
+3. Review type definitions in `src/index.ts:11-58`
+4. Understand tool implementations in `src/index.ts:290-850`
+5. **🛡️ Test security features** with different `GMAIL_ALLOW_DIRECT_SEND` settings
+6. Test with `test-gmail-connection.ts`
+7. Integrate with Claude Desktop for real-world testing
 
 ---
 

@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-08-06
+
+### 🛡️ MAJOR SECURITY OVERHAUL
+
+### Added
+- **🔒 Draft-first security system**: New `GMAIL_ALLOW_DIRECT_SEND` environment variable (defaults to `false`)
+- **📝 `create_draft` tool**: Safe alternative to `send_email` for creating email drafts
+- **⚡ Enhanced `find_and_draft_reply`**: Now accepts optional `replyBody` parameter for custom reply content  
+- **🚨 Security warnings**: Clear messaging throughout all responses about drafts vs sent emails
+- **📋 Comprehensive documentation**: Updated all documentation with security best practices
+- **🛡️ Safety indicators**: All tools now clearly indicate "DRAFT CREATED" vs "EMAIL SENT"
+
+### Changed
+- **🔐 `send_email` tool behavior**: Now disabled by default for safety (requires explicit enabling)
+- **📬 Server startup messages**: Now shows security status (direct sending enabled/disabled)
+- **📝 All response messages**: Enhanced with clear safety indicators and next steps
+- **🎯 Tool descriptions**: Updated to emphasize draft-first approach
+- **📚 Examples and documentation**: Rewritten to prioritize safe draft creation
+- **⚙️ Environment setup**: `.env.example` includes new security variable with documentation
+
+### Security
+- **🛡️ Prevents accidental email sends**: AI assistants can no longer send emails directly without explicit user permission
+- **👀 Mandatory review process**: All emails must be reviewed as drafts before sending
+- **⚠️ Clear safety messaging**: Users always know whether an email was sent or drafted  
+- **🔧 Explicit opt-in**: Direct sending requires conscious environment variable configuration
+- **📖 Security documentation**: Complete security guidelines in README.md and CLAUDE.md
+
 ## [1.1.0] - 2024-12-XX
 
 ### Added
@@ -102,10 +129,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
+- **v1.2.0**: 🛡️ MAJOR SECURITY OVERHAUL - Draft-first safety system, prevents accidental sends
 - **v1.1.0**: Enhanced functionality, better error handling, new tools
 - **v1.0.0**: Initial release with core Gmail functionality
 
 ## Migration Guide
+
+### From 1.1.0 to 1.2.0
+**⚠️ SECURITY BEHAVIOR CHANGE**: `send_email` tool is now disabled by default.
+
+**What changed:**
+- `send_email` tool is disabled unless `GMAIL_ALLOW_DIRECT_SEND=true` is set
+- All email composition now creates drafts by default for safety
+- New `create_draft` tool available as safe alternative
+
+**Action required:**
+1. **Recommended**: Update your AI prompts to use "create draft" instead of "send email"
+2. **Alternative**: Add `GMAIL_ALLOW_DIRECT_SEND=true` to your environment (not recommended for AI assistants)
+3. Update Claude Desktop config to include the new environment variable
+
+**New features available:**
+1. Use `create_draft` tool for safe email composition
+2. Enhanced `find_and_draft_reply` with custom `replyBody` parameter
+3. Clear safety warnings and draft indicators in all responses
 
 ### From 1.0.0 to 1.1.0
 No breaking changes. All existing functionality remains compatible.

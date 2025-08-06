@@ -2,6 +2,8 @@
 
 This file contains practical examples of how to interact with the Gmail MCP server through Claude Desktop.
 
+> **🛡️ Safety Notice**: By default, this server creates email drafts instead of sending emails directly. This prevents accidental sends and allows you to review before sending.
+
 ## Getting Started
 
 First, make sure the Gmail MCP server is properly configured in Claude Desktop. You should see a 🔌 icon indicating the MCP connection.
@@ -23,22 +25,32 @@ List my unread emails
 Show me the full content of email ID 18abc123def456
 ```
 
-## Email Composition
+## Email Composition (Safe Draft Mode)
 
-### Simple Email
-```
-Send an email to john@example.com with the subject "Meeting Tomorrow" and tell him we need to reschedule to 3 PM
-```
+> **✅ Recommended**: These examples create drafts by default for your safety.
 
-### Email with CC
+### Simple Email Draft
 ```
-Send an email to the team at team@company.com with CC to manager@company.com about the project status update
+Create a draft email to john@example.com with the subject "Meeting Tomorrow" and tell him we need to reschedule to 3 PM
 ```
 
-### Professional Email
+### Email Draft with CC
 ```
-Compose and send a professional email to client@company.com thanking them for their business and asking if they need anything else
+Create a draft email to the team at team@company.com with CC to manager@company.com about the project status update
 ```
+
+### Professional Email Draft
+```
+Compose a draft email to client@company.com thanking them for their business and asking if they need anything else
+```
+
+### ⚠️ Direct Sending (Disabled by Default)
+
+If you have `GMAIL_ALLOW_DIRECT_SEND=true` enabled, you can use:
+```
+Send an email directly to john@example.com with subject "Urgent: Meeting Change"
+```
+**Warning**: This bypasses the safety review step.
 
 ## Email Search and Management
 
@@ -69,9 +81,14 @@ Find all unread emails from the company domain that mention "meeting" or "projec
 Create a draft reply to the latest email from support@company.com
 ```
 
+### Draft Reply with Custom Content
+```
+Create a draft reply to the most recent email from my boss saying "Thanks for the update. I'll have the report ready by Friday."
+```
+
 ### Draft Reply to Specific Person
 ```
-Draft a reply to the most recent email from my boss
+Draft a reply to the most recent email from Alice saying "I agree with your proposal. Let's schedule a call to discuss the details."
 ```
 
 ## Practical Workflows
@@ -193,7 +210,7 @@ Search for any email to test the search functionality
 
 ### 1. Be Specific
 Instead of: "Send an email"
-Use: "Send a professional email to client@company.com about the project deadline extension"
+Use: "Create a professional email draft to client@company.com about the project deadline extension"
 
 ### 2. Use Natural Language
 Claude understands context, so you can say:
@@ -208,6 +225,10 @@ Claude understands context, so you can say:
 ### 5. Use Follow-up Questions
 After getting search results:
 "Show me the full content of email #3 from that list"
+
+### 6. Safety First
+Always prefer draft creation:
+"Create a draft reply" instead of "Send a reply"
 
 ## Common Patterns
 
@@ -240,3 +261,28 @@ If you encounter errors:
 3. **Send Error**: "Check the recipient email address and try again"
 
 Remember: Claude can help you troubleshoot issues and suggest alternative approaches!
+
+## 🛡️ Safety Best Practices
+
+### Always Review Before Sending
+1. Create drafts with the MCP server
+2. Go to Gmail → Drafts
+3. Review and edit if needed
+4. Send manually when ready
+
+### Draft Creation Examples
+```
+✅ "Create a draft email..."  
+✅ "Draft a reply saying..."  
+✅ "Compose a draft for..."  
+
+⚠️ "Send an email..." (disabled by default)
+⚠️ "Email them directly..." (requires explicit enabling)
+```
+
+### Review Your Drafts
+```
+"List my current email drafts"
+"Show me all drafts created today"
+"Help me review my pending drafts"
+```

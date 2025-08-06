@@ -25,6 +25,7 @@ interface EmailDetails {
 const CLIENT_ID = process.env.GMAIL_CLIENT_ID
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET
 const REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN
+const ALLOW_DIRECT_SEND = process.env.GMAIL_ALLOW_DIRECT_SEND === "true"
 
 // Validate environment variables
 if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
@@ -33,6 +34,8 @@ if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
   console.error("  • GMAIL_CLIENT_ID")
   console.error("  • GMAIL_CLIENT_SECRET")
   console.error("  • GMAIL_REFRESH_TOKEN")
+  console.error("\n🔧 Optional variables:")
+  console.error("  • GMAIL_ALLOW_DIRECT_SEND=true (enables direct email sending)")
   console.error("\n💡 Run 'npm run setup' to generate these credentials")
   process.exit(1)
 }
@@ -56,7 +59,7 @@ const gmail: gmail_v1.Gmail = google.gmail({
 const server = new Server(
   {
     name: "gmail-mcp-server",
-    version: "1.1.0",
+    version: "1.3.0",
   },
   {
     capabilities: {
@@ -222,7 +225,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "find_and_draft_reply",
         description:
-          "Find the latest email from a sender and create a draft reply",
+          "Find the latest email from a sender and create a properly threaded draft reply. The draft will appear in the original email conversation in your inbox. RECOMMENDED for replying to existing emails.",
         inputSchema: {
           type: "object",
           properties: {
@@ -231,8 +234,51 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "Sender name or email to search for (e.g., 'John', 'user@example.com')",
             },
+            replyBody: {
+              type: "string",
+              description:
+                "Custom reply message body. If not provided, a template will be used.",
+            },
           },
           required: ["senderName"],
+        },
+      },
+      {
+        name: "create_draft",
+        description: "Create a new email draft (safer alternative to send_email). For replies to existing emails, consider using find_and_draft_reply instead.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            to: {
+              type: "string",
+              description: "Recipient email address",
+            },
+            subject: {
+              type: "string",
+              description: "Email subject",
+            },
+            body: {
+              type: "string",
+              description: "Email body (plain text or HTML)",
+            },
+            cc: {
+              type: "string",
+              description: "CC recipients (comma-separated)",
+            },
+            bcc: {
+              type: "string",
+              description: "BCC recipients (comma-separated)",
+            },
+            threadId: {
+              type: "string",
+              description: "Optional: Thread ID to add this draft to an existing conversation",
+            },
+            inReplyToMessageId: {
+              type: "string", 
+              description: "Optional: Message ID of the email this is replying to (enables proper threading)",
+            },
+          },
+          required: ["to", "subject", "body"],
         },
       },
     ],
@@ -401,6 +447,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const args = (request.params.arguments as any) || {}
       const { to, subject, body, cc, bcc } = args
 
+      // ⚠️ SECURITY CHECK: Direct email sending is disabled by default
+      if (!ALLOW_DIRECT_SEND) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `🚨 **SECURITY: Direct email sending is disabled**
+
+❌ **send_email** tool is disabled for safety to prevent accidental sends.
+
+💡 **Safe alternatives:**
+• Use **create_draft** to create an email draft instead
+• Use **find_and_draft_reply** to reply to existing emails as drafts
+• Set GMAIL_ALLOW_DIRECT_SEND=true in your .env to enable direct sending
+
+🛡️ **Why this protection exists:**
+This prevents AI assistants from accidentally sending emails without your review.
+Always prefer creating drafts that you can review and send manually.`,
+            },
+          ],
+        }
+      }
+
       try {
         // Validate email addresses
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -438,9 +507,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text",
-              text: `✅ **Email sent successfully!**\n\n📧 To: ${to}\n📋 Subject: ${subject}\n🆔 Message ID: ${
-                result.data.id
-              }\n${cc ? `📄 CC: ${cc}\n` : ""}${bcc ? `🔒 BCC: ${bcc}\n` : ""}`,
+              text: `🚨 **EMAIL SENT DIRECTLY!** ⚠️
+
+✅ **Email sent successfully!**
+
+📧 To: ${to}
+📋 Subject: ${subject}
+🆔 Message ID: ${result.data.id}
+${cc ? `📄 CC: ${cc}\n` : ""}${bcc ? `🔒 BCC: ${bcc}\n` : ""}
+
+⚠️ **IMPORTANT:** This email was sent immediately without creating a draft.
+💡 **Next time:** Consider using **create_draft** or **find_and_draft_reply** for safer email handling.`,
             },
           ],
         }
@@ -558,15 +635,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     case "find_and_draft_reply": {
       const args = (request.params.arguments as any) || {}
-      const { senderName } = args
+      const { senderName, replyBody } = args
 
       try {
         if (!senderName || senderName.trim() === "") {
           throw new Error("Sender name cannot be empty")
         }
 
-        // Search for emails from the specific sender
-        const searchQuery = `from:${senderName}`
+        // Search for emails from the specific sender (excluding sent items to avoid replying to our own emails)
+        const searchQuery = `from:${senderName} -in:sent`
 
         const response = await gmail.users.messages.list({
           userId: "me",
@@ -581,7 +658,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [
               {
                 type: "text",
-                text: `📭 No emails found from "${senderName}"\n\n💡 Try using the full email address or a different name.`,
+                text: `📭 No emails found from "${senderName}"\n\n💡 Try using:\n• Full email address (user@example.com)\n• Different name variation\n• Check if you received emails from this sender recently`,
               },
             ],
           }
@@ -592,6 +669,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const detail = await gmail.users.messages.get({
           userId: "me",
           id: latestMessage.id!,
+          format: "full", // Get full message for complete headers
         })
 
         const headers = detail.data.payload?.headers || []
@@ -602,20 +680,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const messageId =
           headers.find((h) => h.name === "Message-ID")?.value || ""
         const date = headers.find((h) => h.name === "Date")?.value || ""
+        const existingReferences = 
+          headers.find((h) => h.name === "References")?.value || ""
 
-        // Extract email address from From header
-        const emailMatch =
-          fromEmail.match(/<(.+?)>/) || fromEmail.match(/([^\s<>]+@[^\s<>]+)/)
-        const replyToEmail = emailMatch
-          ? emailMatch[1] || emailMatch[0]
-          : fromEmail
+        // Validate that we have threading information
+        if (!detail.data.threadId) {
+          console.warn("Warning: No threadId found for email, draft may not thread properly")
+        }
+        if (!messageId) {
+          console.warn("Warning: No Message-ID found for email, threading may be incomplete")
+        }
 
-        // Create reply subject
+        // Extract email address from From header with improved regex
+        let replyToEmail = ""
+        const emailRegex = /<([^<>]+@[^<>]+)>/
+        const simpleEmailRegex = /([^\s<>]+@[^\s<>]+)/
+        
+        const complexMatch = fromEmail.match(emailRegex)
+        const simpleMatch = fromEmail.match(simpleEmailRegex)
+        
+        if (complexMatch) {
+          replyToEmail = complexMatch[1]
+        } else if (simpleMatch) {
+          replyToEmail = simpleMatch[1]
+        } else {
+          // Fallback to original fromEmail, but validate it's an email
+          const emailValidationRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+          replyToEmail = emailValidationRegex.test(fromEmail) ? fromEmail : ""
+        }
+
+        if (!replyToEmail) {
+          throw new Error(`Could not extract valid email address from: ${fromEmail}`)
+        }
+
+        // Create reply subject with proper formatting
         const replySubject = originalSubject.startsWith("Re: ")
           ? originalSubject
           : `Re: ${originalSubject}`
 
-        // Create draft reply with proper MIME headers
+        // Build References header properly (include existing references + original message ID)
+        const referencesHeader = existingReferences 
+          ? `${existingReferences} ${messageId}`.trim()
+          : messageId
+
+        // Create draft reply with proper MIME headers for threading
         const draftMessage = [
           `MIME-Version: 1.0`,
           `Content-Type: text/plain; charset=UTF-8`,
@@ -623,13 +731,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `To: ${replyToEmail}`,
           `Subject: ${replySubject}`,
           messageId ? `In-Reply-To: ${messageId}` : "",
-          messageId ? `References: ${messageId}` : "",
+          referencesHeader ? `References: ${referencesHeader}` : "",
           "",
-          `Hi,`,
-          "",
-          `[Write your reply here]`,
-          "",
-          `Best regards`,
+          replyBody || `Hi,
+
+[Write your reply here]
+
+Best regards`,
         ]
           .filter((line) => line !== "")
           .join("\n")
@@ -654,12 +762,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text",
-              text: `✅ **Draft reply created successfully!**
+              text: `✅ **THREADED DRAFT REPLY CREATED** 🧵📝
 
 📧 **Original email:**
 • From: ${fromEmail}
 • Subject: ${originalSubject}
 • Date: ${date}
+• Message ID: ${messageId || "Not found"}
 • Preview: ${detail.data.snippet?.substring(0, 150)}${
                 (detail.data.snippet?.length || 0) > 150 ? "..." : ""
               }
@@ -669,8 +778,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 • Subject: ${replySubject}
 • Draft ID: ${draftResult.data.id}
 • Thread ID: ${detail.data.threadId}
+• Threading: ${messageId ? "✅ Properly threaded" : "⚠️ Limited threading"}
 
-💡 The draft is ready in your Gmail. You can edit and send it whenever you're ready.`,
+🧵 **THREADING STATUS:** This draft will appear in your inbox as part of the original email conversation.
+🛡️ **SAFETY NOTICE:** This is a DRAFT only - no email has been sent.
+📬 **Next steps:** Go to Gmail → Inbox → Find original email → View conversation → Edit draft → Send when ready.
+💡 **Custom content:** ${replyBody ? "Your custom reply body was used." : "Template reply was used - edit to personalize."}`,
             },
           ],
         }
@@ -682,7 +795,112 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: "text",
               text: `❌ Error creating draft reply: ${
                 error.message || error
-              }\n\n💡 Make sure the sender name is correct and you have draft creation permissions.`,
+              }\n\n💡 **Troubleshooting tips:**
+• Verify sender name/email is correct
+• Check that you received emails from this sender
+• Ensure Gmail API permissions include draft creation
+• Try using exact email address instead of name`,
+            },
+          ],
+        }
+      }
+    }
+
+    case "create_draft": {
+      const args = (request.params.arguments as any) || {}
+      const { to, subject, body, cc, bcc, threadId, inReplyToMessageId } = args
+
+      try {
+        // Validate email addresses
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(to)) {
+          throw new Error(`Invalid recipient email address: ${to}`)
+        }
+
+        // Build message headers
+        const messageParts = [
+          `MIME-Version: 1.0`,
+          `Content-Type: text/plain; charset=UTF-8`,
+          `To: ${to}`,
+        ]
+
+        if (cc) messageParts.push(`Cc: ${cc}`)
+        if (bcc) messageParts.push(`Bcc: ${bcc}`)
+
+        messageParts.push(`Subject: ${subject}`)
+
+        // Add threading headers if provided
+        let threadingInfo = ""
+        if (inReplyToMessageId) {
+          messageParts.push(`In-Reply-To: ${inReplyToMessageId}`)
+          messageParts.push(`References: ${inReplyToMessageId}`)
+          threadingInfo = "✅ Threaded (will appear in conversation)"
+        } else if (threadId) {
+          threadingInfo = "⚠️ Partial threading (threadId only)"
+        } else {
+          threadingInfo = "📧 Standalone draft (new conversation)"
+        }
+
+        // Add empty line before body
+        messageParts.push("", body)
+
+        const message = messageParts.join("\n")
+
+        const encodedMessage = Buffer.from(message)
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "")
+
+        // Prepare draft creation request
+        const draftRequest: any = {
+          userId: "me",
+          requestBody: {
+            message: {
+              raw: encodedMessage,
+            },
+          },
+        }
+
+        // Add threadId if provided
+        if (threadId) {
+          draftRequest.requestBody.message.threadId = threadId
+        }
+
+        const result = await gmail.users.drafts.create(draftRequest)
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ **EMAIL DRAFT CREATED (Safe Mode)** 📝
+
+📝 **Draft Details:**
+• To: ${to}
+• Subject: ${subject}
+• Draft ID: ${result.data.id}
+${cc ? `• CC: ${cc}\n` : ""}${bcc ? `• BCC: ${bcc}\n` : ""}${threadId ? `• Thread ID: ${threadId}\n` : ""}${inReplyToMessageId ? `• Reply to Message: ${inReplyToMessageId}\n` : ""}
+🧵 **Threading:** ${threadingInfo}
+
+🛡️ **SAFETY NOTICE:** This is a DRAFT only - no email has been sent.
+📬 **Next steps:** Go to Gmail → ${threadId ? "Inbox → Find original conversation" : "Drafts"} → Edit and review → Send when ready.
+💡 **Tip:** ${threadId || inReplyToMessageId ? "This draft will appear in the existing email thread." : "Always review drafts before sending to ensure accuracy."}`,
+            },
+          ],
+        }
+      } catch (error: any) {
+        console.error("Error creating draft:", error)
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Error creating draft: ${
+                error.message || error
+              }\n\n💡 **Troubleshooting tips:**
+• Check that the recipient address is valid
+• Verify Gmail API permissions include draft creation
+• If using threading parameters, ensure threadId/messageId are valid
+• For replies, consider using find_and_draft_reply instead`,
             },
           ],
         }
@@ -703,7 +921,10 @@ async function main() {
     `📧 Connected as: ${process.env.GMAIL_CLIENT_ID?.substring(0, 20)}...`
   )
   console.error(
-    "🔧 Tools available: list_emails, get_email_details, send_email, search_emails, find_and_draft_reply"
+    "🔧 Tools available: list_emails, get_email_details, send_email, search_emails, find_and_draft_reply, create_draft"
+  )
+  console.error(
+    `🛡️ Security: Direct sending ${ALLOW_DIRECT_SEND ? "ENABLED" : "DISABLED (use create_draft instead)"}`
   )
 }
 

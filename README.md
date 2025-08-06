@@ -6,9 +6,9 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 A powerful MCP (Model Context Protocol) server that enables AI assistants to
-interact with Gmail through OAuth2 authentication. Built with TypeScript and
-designed for seamless integration with Claude Desktop and other MCP-compatible
-clients.
+interact with Gmail through OAuth2 authentication **with safety-first design**.
+Built with TypeScript and designed for seamless integration with Claude Desktop
+and other MCP-compatible clients.
 
 ## 📑 Table of Contents
 
@@ -29,15 +29,13 @@ clients.
 
 ## ✨ Features
 
+- 🛡️ **Safety First** - Draft-only mode by default prevents accidental email sends
+- 📝 **Smart Drafts** - Create drafts for new emails and replies with custom content
 - 📬 **List Emails** - Retrieve recent emails with advanced filtering options
-- 📖 **Get Email Details** - Fetch complete email content including attachments
-  info
-- ✉️ **Send Emails** - Compose and send emails with CC/BCC support
-- 🔍 **Search Emails** - Use Gmail's powerful search syntax to find specific
-  emails
-- 💬 **Draft Replies** - Automatically create draft replies to specific senders
-- 🔐 **Secure OAuth2** - Industry-standard authentication with refresh token
-  support
+- 📖 **Get Email Details** - Fetch complete email content including attachments info
+- 🔍 **Search Emails** - Use Gmail's powerful search syntax to find specific emails
+- ✉️ **Send Emails** - Direct sending (disabled by default, enable with caution)
+- 🔐 **Secure OAuth2** - Industry-standard authentication with refresh token support
 - 🎯 **Type-Safe** - Full TypeScript implementation with strict typing
 - 🚀 **High Performance** - Optimized with parallel processing and smart caching
 
@@ -71,6 +69,8 @@ npm install
 ```bash
 cp .env.example .env
 ```
+
+> **🛡️ Security Note**: By default, direct email sending is disabled for safety. The server will create drafts instead, which you can review and send manually from Gmail.
 
 ## ⚙️ Configuration
 
@@ -125,6 +125,8 @@ cp .env.example .env
 GMAIL_CLIENT_ID=your_client_id_here
 GMAIL_CLIENT_SECRET=your_client_secret_here
 GMAIL_REFRESH_TOKEN=
+# Security: Keep this false unless you need direct sending
+GMAIL_ALLOW_DIRECT_SEND=false
 ```
 
 2. **Run the setup script:**
@@ -191,7 +193,8 @@ npm run build
       "env": {
         "GMAIL_CLIENT_ID": "your_client_id",
         "GMAIL_CLIENT_SECRET": "your_client_secret",
-        "GMAIL_REFRESH_TOKEN": "your_refresh_token"
+        "GMAIL_REFRESH_TOKEN": "your_refresh_token",
+        "GMAIL_ALLOW_DIRECT_SEND": "false"
       }
     }
   }
@@ -206,6 +209,8 @@ npm run build
    - Try: "List my recent emails"
 
 ## 🛠️ Available Tools
+
+> **🛡️ Safety Notice**: Tools marked with 🛡️ create drafts by default for your safety. Direct sending tools marked with 🚨 are disabled by default.
 
 ### 📬 list_emails
 
@@ -239,9 +244,29 @@ Get complete details and content of a specific email.
 Get the full content of email ID 18abc123def
 ```
 
-### ✉️ send_email
+### 🛡️ create_draft
 
-Send an email with optional CC/BCC recipients.
+Create an email draft with optional CC/BCC recipients (recommended for AI assistants).
+
+**Parameters:**
+
+- `to` (string, required): Recipient email address
+- `subject` (string, required): Email subject
+- `body` (string, required): Email body (plain text or HTML)
+- `cc` (string): CC recipients (comma-separated)
+- `bcc` (string): BCC recipients (comma-separated)
+
+**Example:**
+
+```
+Create a draft email to john@example.com with subject "Meeting Tomorrow" and body "Let's meet at 10 AM"
+```
+
+### 🚨 send_email (Disabled by Default)
+
+Send an email directly with optional CC/BCC recipients.
+
+**⚠️ Security Warning**: This tool is disabled by default. Set `GMAIL_ALLOW_DIRECT_SEND=true` to enable.
 
 **Parameters:**
 
@@ -276,18 +301,19 @@ Search emails using Gmail's advanced search syntax.
 - `newer_than:2d` - Emails from last 2 days
 - `label:work` - Emails with specific label
 
-### 💬 find_and_draft_reply
+### 🛡️ find_and_draft_reply
 
-Find the latest email from a sender and create a draft reply.
+Find the latest email from a sender and create a draft reply with optional custom content.
 
 **Parameters:**
 
 - `senderName` (string, required): Sender name or email address
+- `replyBody` (string, optional): Custom reply content (template used if not provided)
 
 **Example:**
 
 ```
-Create a draft reply to the latest email from John Smith
+Create a draft reply to the latest email from John Smith saying "Thanks for your message. I'll get back to you soon."
 ```
 
 ## 📚 Examples
@@ -306,10 +332,10 @@ Show me my 10 most recent emails
 Search for emails from alice@example.com with attachments
 ```
 
-**Send a simple email:**
+**Create a draft email:**
 
 ```
-Send an email to bob@example.com saying "Thanks for your help!"
+Create a draft email to bob@example.com saying "Thanks for your help!"
 ```
 
 **Create a draft reply:**
@@ -326,10 +352,10 @@ Draft a reply to the latest email from support@company.com
 Find all unread emails from the last week with "invoice" in the subject
 ```
 
-**Email with CC:**
+**Draft with CC:**
 
 ```
-Send an email to team@company.com with CC to manager@company.com about the project update
+Create a draft email to team@company.com with CC to manager@company.com about the project update
 ```
 
 **Get email details:**
@@ -344,12 +370,20 @@ Show me the full content of the most recent email from my boss
 
 #### ❌ Error: Missing required environment variables
 
-**Solution:** Ensure all three environment variables are set in your `.env`
-file:
+**Solution:** Ensure all required environment variables are set in your `.env` file:
 
-- GMAIL_CLIENT_ID
-- GMAIL_CLIENT_SECRET
-- GMAIL_REFRESH_TOKEN
+- `GMAIL_CLIENT_ID`
+- `GMAIL_CLIENT_SECRET` 
+- `GMAIL_REFRESH_TOKEN`
+- `GMAIL_ALLOW_DIRECT_SEND` (optional, defaults to `false`)
+
+#### 🛡️ Security: Direct email sending is disabled
+
+**This is normal and safe behavior.** By default, the server creates drafts instead of sending emails directly.
+
+**Solutions:**
+- **Recommended**: Use `create_draft` tool instead of `send_email`
+- **Alternative**: Set `GMAIL_ALLOW_DIRECT_SEND=true` in your `.env` file (not recommended for AI assistants)
 
 #### ❌ Error 403: access_denied
 
@@ -394,6 +428,33 @@ file:
 - Gmail API has quotas (250 quota units per user per second)
 - Implement exponential backoff for retries
 - Reduce the number of parallel requests
+
+## 🔒 Security Guidelines
+
+### Draft-First Approach
+
+This server implements a **safety-first design** to prevent accidental email sends:
+
+- **Default behavior**: Creates drafts that require manual review
+- **Protection**: `send_email` tool is disabled by default
+- **User control**: Explicit environment variable required for direct sending
+
+### Recommended Usage
+
+✅ **Safe for AI assistants:**
+- `create_draft` - Creates email drafts
+- `find_and_draft_reply` - Creates reply drafts
+- `list_emails`, `search_emails`, `get_email_details` - Read-only operations
+
+⚠️ **Use with caution:**
+- `send_email` - Only enable if you fully trust the AI assistant and understand the risks
+
+### Best Practices
+
+1. **Keep `GMAIL_ALLOW_DIRECT_SEND=false`** unless absolutely necessary
+2. **Review all drafts** before sending manually from Gmail
+3. **Test thoroughly** in a safe environment before production use
+4. **Monitor usage** and check for unexpected behavior
 
 ## 🔨 Development
 
