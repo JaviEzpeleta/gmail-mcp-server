@@ -111,11 +111,17 @@ cp .env.example .env
 2. **Create OAuth client:**
    - Go to **APIs & Services** → **Credentials**
    - Click **+ CREATE CREDENTIALS** → **OAuth client ID**
-   - Application type: **Desktop app**
-   - Name: "Gmail MCP Desktop Client"
+   - Application type: **Web application** ⚠️ (NOT Desktop app)
+   - Name: "Gmail MCP Web Client"
+   - **Configure Authorized redirect URIs:**
+     - Click **+ ADD URI**
+     - Add: `http://localhost:8765/oauth2callback` (default port)
+     - If you plan to use a custom port, add: `http://localhost:YOUR_PORT/oauth2callback`
    - Click **Create**
    - **Download the credentials** (you'll see a download button or JSON option)
    - Save the `client_id` and `client_secret` from the downloaded file
+
+> **⚠️ Important**: Desktop app type doesn't allow custom redirect URIs, but we need `localhost:PORT/oauth2callback` for the OAuth flow to work. That's why we use **Web application** instead.
 
 ### 3. Generate Refresh Token
 
@@ -127,7 +133,11 @@ GMAIL_CLIENT_SECRET=your_client_secret_here
 GMAIL_REFRESH_TOKEN=
 # Security: Keep this false unless you need direct sending
 GMAIL_ALLOW_DIRECT_SEND=false
+# OAuth setup port (must match the redirect URI you configured above)
+OAUTH_REDIRECT_PORT=8765
 ```
+
+> **💡 Port Configuration**: The `OAUTH_REDIRECT_PORT` must match the port you configured in the Google Cloud Console redirect URI. If you used `http://localhost:8765/oauth2callback`, keep it as 8765. If you used a different port, update this value accordingly.
 
 2. **Run the setup script:**
 
@@ -376,6 +386,21 @@ Show me the full content of the most recent email from my boss
 - `GMAIL_CLIENT_SECRET` 
 - `GMAIL_REFRESH_TOKEN`
 - `GMAIL_ALLOW_DIRECT_SEND` (optional, defaults to `false`)
+- `OAUTH_REDIRECT_PORT` (optional, defaults to `8765`)
+
+#### ❌ Error: redirect_uri_mismatch
+
+**Problem:** OAuth setup fails with "The redirect URI in the request does not match the ones authorized for the OAuth client."
+
+**Solution:** 
+1. Go to Google Cloud Console → APIs & Services → Credentials
+2. Click on your OAuth client
+3. In "Authorized redirect URIs", ensure you have: `http://localhost:8765/oauth2callback`
+4. If using a custom port, add: `http://localhost:YOUR_PORT/oauth2callback`
+5. Make sure your `.env` file has the matching `OAUTH_REDIRECT_PORT=8765`
+6. **Important**: OAuth client must be **Web application** type, not Desktop app
+
+> This error commonly occurs when following old documentation that suggests using "Desktop app" type, which doesn't support custom redirect URIs.
 
 #### 🛡️ Security: Direct email sending is disabled
 
