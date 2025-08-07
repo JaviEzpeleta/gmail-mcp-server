@@ -7,6 +7,7 @@ import { exec } from "child_process"
 
 const CLIENT_ID = process.env.GMAIL_CLIENT_ID
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET
+const OAUTH_REDIRECT_PORT = parseInt(process.env.OAUTH_REDIRECT_PORT || "8765", 10)
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.error("❌ Error: Missing GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET environment variables")
@@ -14,8 +15,8 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
   process.exit(1)
 }
 
-// For Desktop apps, we can use localhost or Google's special URI
-const REDIRECT_URI = "http://localhost:3000/oauth2callback"
+// For Desktop apps, we can use localhost with configurable port
+const REDIRECT_URI = `http://localhost:${OAUTH_REDIRECT_PORT}/oauth2callback`
 const oauth2Client = new google.auth.OAuth2(
   CLIENT_ID,
   CLIENT_SECRET,
@@ -32,7 +33,7 @@ async function getRefreshToken() {
   // Create temporary server to capture the authorization code
   const server = http.createServer(async (req, res) => {
     if (req.url && req.url.indexOf("/oauth2callback") > -1) {
-      const qs = new url.URL(req.url, `http://localhost:3000`).searchParams
+      const qs = new url.URL(req.url, `http://localhost:${OAUTH_REDIRECT_PORT}`).searchParams
       const code = qs.get("code")
 
       res.end("✅ Authorization received! You can close this window.")
@@ -60,7 +61,7 @@ async function getRefreshToken() {
     }
   })
 
-  server.listen(3000, () => {
+  server.listen(OAUTH_REDIRECT_PORT, () => {
     // Generate authorization URL
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
@@ -92,5 +93,6 @@ async function getRefreshToken() {
 }
 
 // Execute
-console.log("🔐 Gmail OAuth Setup for Terminal/CLI\n")
+console.log("🔐 Gmail OAuth Setup for Terminal/CLI")
+console.log(`🔧 Using OAuth redirect port: ${OAUTH_REDIRECT_PORT} ${OAUTH_REDIRECT_PORT !== 8765 ? "(custom)" : "(default)"}\n`)
 getRefreshToken()
