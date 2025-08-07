@@ -477,20 +477,23 @@ Always prefer creating drafts that you can review and send manually.`,
           throw new Error(`Invalid recipient email address: ${to}`)
         }
 
+        // Build email following Gmail API working pattern
+        const subjectBase64 = Buffer.from(subject, 'utf-8').toString('base64')
         const messageParts = [
+          `Content-Type: text/plain; charset="UTF-8"`,
           `MIME-Version: 1.0`,
-          `Content-Type: text/plain; charset=UTF-8`,
+          `Content-Transfer-Encoding: 7bit`,
           `To: ${to}`,
         ]
 
         if (cc) messageParts.push(`Cc: ${cc}`)
         if (bcc) messageParts.push(`Bcc: ${bcc}`)
 
-        messageParts.push(`Subject: ${subject}`, "", body)
+        messageParts.push(`Subject: =?UTF-8?B?${subjectBase64}?=`, "", body)
 
-        const message = messageParts.join("\n")
+        const message = messageParts.join("\r\n")
 
-        const encodedMessage = Buffer.from(message)
+        const encodedMessage = Buffer.from(message, "utf-8")
           .toString("base64")
           .replace(/\+/g, "-")
           .replace(/\//g, "_")
@@ -729,7 +732,7 @@ ${cc ? `📄 CC: ${cc}\n` : ""}${bcc ? `🔒 BCC: ${bcc}\n` : ""}
           `Content-Type: text/plain; charset=UTF-8`,
           `Content-Transfer-Encoding: 8bit`,
           `To: ${replyToEmail}`,
-          `Subject: ${replySubject}`,
+          `Subject: =?UTF-8?B?${Buffer.from(replySubject, 'utf-8').toString('base64')}?=`,
           messageId ? `In-Reply-To: ${messageId}` : "",
           referencesHeader ? `References: ${referencesHeader}` : "",
           "",
@@ -821,13 +824,16 @@ Best regards`,
         const messageParts = [
           `MIME-Version: 1.0`,
           `Content-Type: text/plain; charset=UTF-8`,
+          `Content-Transfer-Encoding: 8bit`,
           `To: ${to}`,
         ]
 
         if (cc) messageParts.push(`Cc: ${cc}`)
         if (bcc) messageParts.push(`Bcc: ${bcc}`)
 
-        messageParts.push(`Subject: ${subject}`)
+        // RFC 2047 encoding for subject (required for emojis and unicode)
+        const subjectBase64 = Buffer.from(subject, 'utf-8').toString('base64')
+        messageParts.push(`Subject: =?UTF-8?B?${subjectBase64}?=`)
 
         // Add threading headers if provided
         let threadingInfo = ""
@@ -844,9 +850,9 @@ Best regards`,
         // Add empty line before body
         messageParts.push("", body)
 
-        const message = messageParts.join("\n")
+        const message = messageParts.join("\r\n")
 
-        const encodedMessage = Buffer.from(message)
+        const encodedMessage = Buffer.from(message, "utf-8")
           .toString("base64")
           .replace(/\+/g, "-")
           .replace(/\//g, "_")
